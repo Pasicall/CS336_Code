@@ -12,6 +12,10 @@ from torch import Tensor
 from cs336_basics.train_bpe import train_bpe
 from cs336_basics.tokenizer import BPETokenizer
 from cs336_basics.nn import RMSNorm
+from cs336_basics.nn import silu_fn
+from cs336_basics.nn import SwiGLU
+
+
 
 
 def run_linear(
@@ -87,7 +91,12 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLU(d_model,d_ff,device=in_features.device,dtype=in_features.dtype)
+    swiglu.w1.weight.data = w1_weight
+    swiglu.w2.weight.data = w2_weight
+    swiglu.w3.weight.data = w3_weight
+    return swiglu(in_features)
+
 
 
 def run_scaled_dot_product_attention(
@@ -398,7 +407,7 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    return silu_fn(in_features)
 
 
 def run_get_batch(

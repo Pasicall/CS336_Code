@@ -47,5 +47,50 @@ class RMSNorm(nn.Module):
         rms = torch.sqrt(ms + self.eps)
 
         result = (x_float / rms) * self.weight
-        return result.to(in_dtype)        
+        return result.to(in_dtype)
+
+def silu_fn(in_features):
+    return in_features * torch.sigmoid(in_features)
+
+class SwiGLU(nn.Module):
+    def __init__(self, d_model:int, d_ff:int, device: None, dtype:None):
+        super().__init__()
+
+        self.d_model = d_model
+        self.d_ff = d_ff
+        #w1和w3进行升维操作
+        self.w1 = Linear(d_model,d_ff,device,dtype)
+        self.w3 = Linear(d_model,d_ff,device,dtype)
+        #w2进行降维操作
+        self.w2 = Linear(d_ff,d_model,device,dtype)
+
+    def forward(self, x:torch.Tensor) -> torch.Tensor:
+        gate = silu_fn(self.w1(x))
+        signal = self.w3(x)
+        return self.w2(gate * signal)
+
+class RotaryPositionalEmbedding(nn.Module):
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+        super().__init__()
+        self.d_k = d_k
+
+        #构建频率 omega_k = theta^((2k-2)/d)
+        powers = torch.arange(0,d_k,2,device=device).float() / d_k
+        freqs = 1.0 / (theta ** powers)
+
+        #创建位置序列
+        t = torch.arange(max_seq_len,device=device).float()
+
+        #做外积计算所有角度
+        freqs_matrix = torch.outer(t,freqs)
+
+        # 预计算 cos 和 sin 并作为 buffer 注册
+        self.register_buffer("cos_cached", freqs_matrix.cos(), persistent=False)
+        self.register_buffer("sin_cached", freqs_matrix.sin(), persistent=False)
+
+    def forward(self,):
+
+
+
+
 
