@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 class Linear(nn.Module):
     def __init__(self, in_features, out_features, device=None, dtype=None):
@@ -88,7 +89,57 @@ class RotaryPositionalEmbedding(nn.Module):
         self.register_buffer("cos_cached", freqs_matrix.cos(), persistent=False)
         self.register_buffer("sin_cached", freqs_matrix.sin(), persistent=False)
 
-    def forward(self,):
+    def forward(self, x:torch.Tensor, token_positions:torch.Tensor) -> torch.Tensor:
+        cos = self.cos_cached[token_positions]
+        sin = self.sin_cached[token_positions]
+
+        #维度对齐
+        if x.ndim > cos.ndim and cos.ndim >= 3:
+            cos = cos.unsqueeze(1)
+            sin = sin.unsqueeze(1)
+
+        cos = cos.to(x.dtype)
+        sin = sin.to(x.dtype)
+
+        # 拆分并旋转
+        x_even = x[..., 0::2]
+        x_odd = x[..., 1::2]
+
+        output = torch.empty_like(x)
+        output[..., 0::2] = x_even * cos - x_odd * sin
+        output[..., 1::2] = x_even * sin + x_odd * cos
+
+        return output
+
+def softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    x_max = torch.max(x, dim=dim, keepdim=True).values
+    x_stable = x - x_max
+
+    #计算指数
+    exp_x = torch.exp(x_stable)
+    #计算分母
+    sum_exp = torch.sum(exp_x, dim=dim, keepdim=True)
+
+    return exp_x / sum_exp
+
+def scaled_dot_product_attention(
+        Q: torch.Tensor,
+        K: torch.Tensor,
+        V: torch.Tensor,
+        mask: torch.Tensor = None
+)-> torch.Tensor:
+
+    d_k = Q.size(-1)
+    #计算分数
+    scores = torch.einsum('...nk, ...mk-> ...nm', Q, K) / math.sqrt(d_k)
+    #进行掩码
+    if mask is not None:
+        scores = scores.masked_fill(mask == False, float('-inf'))
+
+    probs = softmax(scores, dim=-1)
+    output = torch.einsum('...nm,...mk->...nk',probs,V)
+
+    return output
 
 
 
