@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import math
+from einops import rearrange
+
 
 class Linear(nn.Module):
     def __init__(self, in_features, out_features, device=None, dtype=None):
@@ -141,6 +143,53 @@ def scaled_dot_product_attention(
 
     return output
 
+class CausalSelfAttention(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, bias: bool = False, 
+                max_seq_len=None, theta=None, 
+                device=None, dtype=None):
+        super().__init__()
+        assert d_model % num_heads == 0
+
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+
+        #定义Q,K,V的投影层
+        self.q_proj = Linear(d_model,d_model,device=device,dtype=dtype)
+        self.k_proj = Linear(d_model,d_model,device=device,dtype=dtype)
+        self.v_proj = Linear(d_model,d_model,device=device,dtype=dtype)
+        #定义输出投影
+        self.output_proj = Linear(d_model,d_model,device=device,dtype=dtype)
+
+        if theta is not None and max_seq_len is not None:
+            self.rope = RotaryPositionalEmbedding(theta,self.d_k,max_seq_len,device=device)
+        else:
+            self.rope = None
+
+    def forward(self, x:torch.Tensor, token_positions: torch.Tensor = None) -> torch.Tensor:
+        b,s,d = x.shape
+
+        #投影与拆分注意力头
+        # 将原来的 （batch, Size, d_model）---> (batch_size, nums_head, Size, d_k) h为拆分的头的数量,d_k是每个头的维度
+        q = rearrange(self.q_proj(x), pattern='... s (h d) -> ... h s d', h=self.num_heads)
+        k = rearrange(self.k_proj(x), pattern='... s (h d) -> ... h s d', h=self.num_heads)
+        v = rearrange(self.v_proj(x), pattern='... s (h d) -> ... h s d', h=self.num_heads)
+
+        #使用RoPE
+        if self.rope is not None:
+            if token_positions is None:
+                batch_dims = x.shape[:-2]
+                token_positions = torch.arange(s, device=x.device).expand(*batch_dims,s)
+
+            q = self.rope(q,token_positions)
+            k = self.rope(k,token_positions)
+
+        mask = torch.tril(torch.ones(s, s, device=x.device, dtype=torch.bool))
+
+        attn_out = scaled_dot_product_attention(q,k,v,mask=mask)
+        # 合并与输出投影
+        attn_out = rearrange(attn_out, pattern='... h s d -> ... s (h d)')
+        return self.output_proj(attn_out)
 
 
 
