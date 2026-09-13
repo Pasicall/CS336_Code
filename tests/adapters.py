@@ -18,6 +18,8 @@ from cs336_basics.nn import RotaryPositionalEmbedding
 from cs336_basics.nn import softmax
 from cs336_basics.nn import scaled_dot_product_attention
 from cs336_basics.nn import CausalSelfAttention
+from cs336_basics.nn import TransformerBlock
+
 
 
 
@@ -305,8 +307,27 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
-
+    block = TransformerBlock(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        max_seq_len=max_seq_len,
+        theta=theta,
+        device=in_features.device,
+        dtype=in_features.dtype,
+        use_rms_norm=True,
+        norm_mode="pre",
+        ffn_type="swiglu")
+    block.ln1.weight.data.copy_(weights["ln1.weight"])
+    block.attn.q_proj.weight.data.copy_(weights["attn.q_proj.weight"])
+    block.attn.k_proj.weight.data.copy_(weights["attn.k_proj.weight"])
+    block.attn.v_proj.weight.data.copy_(weights["attn.v_proj.weight"])
+    block.attn.output_proj.weight.data.copy_(weights["attn.output_proj.weight"])
+    block.ln2.weight.data.copy_(weights["ln2.weight"])
+    block.ffn.w1.weight.data.copy_(weights["ffn.w1.weight"])
+    block.ffn.w2.weight.data.copy_(weights["ffn.w2.weight"])
+    block.ffn.w3.weight.data.copy_(weights["ffn.w3.weight"])
+    return block(in_features)
 
 def run_transformer_lm(
     vocab_size: int,

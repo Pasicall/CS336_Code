@@ -192,5 +192,93 @@ class CausalSelfAttention(nn.Module):
         return self.output_proj(attn_out)
 
 
+from .nn import Embedding, RMSNorm, Linear, CausalSelfAttention, SwiGLU
+class TransformerBlock(nn.Module):
+    def __init__(self, d_model:int, num_heads:int, d_ff:int, max_seq_len:int, 
+                theta: float, device=None, dtype=None,
+                use_rms_norm:bool=True,
+                norm_mode:str="pre",
+                ffn_type:str="swiglu"):
+        super().__init__()
+        self.use_rms_norm = use_rms_norm
+        self.norm_mode = norm_mode
+        self.ffn_type = ffn_type
+
+        # 初始化attention
+        self.attn = CausalSelfAttention(
+            d_model=d_model,    
+            num_heads=num_heads,
+            max_seq_len=max_seq_len,
+            theta=theta,
+            device=device,
+            dtype=dtype
+        )
+
+        # 初始化norm层
+        if use_rms_norm:
+            self.ln1 = RMSNorm(d_model, device=device, dtype=dtype)
+            self.ln2 = RMSNorm(d_model, device=device, dtype=dtype)
+        else:
+            self.ln1 = nn.Identity()
+            self.ln2 = nn.Identity()
+
+        # 初始化FFN
+        if ffn_type == "swiglu":
+            self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+        elif ffn_type == "silu":
+            # 传统LLM使用 Linear -> SiLu -> Linear的前馈网络结构, 使用nn.Sequential能够构建一个简单的前馈网络实现，不需要构建forward
+            self.ffn = nn.Sequential(
+                Linear(d_model, d_ff, device=device, dtype=dtype),
+                nn.SiLU(),
+                Linear(d_ff, d_model, device=device, dtype=dtype)
+            )
+        else:
+            raise ValueError(f"Unknown ffn_type:{ffn_type}")
+
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor = None) -> torch.Tensor:
+        # pre_norm: x = x + multiheadselfattention(norm(x)) 
+        if self.norm_mode == "pre":
+            x = x + self.attn(self.ln1(x),token_positions=token_positions)
+            x = x + self.ffn(self.ln2(x))
+        if self.norm_mode == "post":
+        # post_norm : x = norm(x + multiheadselfattention(x))
+            x = self.ln1(x + self.attn(x, token_positions=token_positions))
+            x = self.ln2(x + self.ffn(x))
+        return x     
+
+class TransformerLM(nn.Module):
+    def __init__(self, vocab_size: int, context_length: int, d_model: int,
+                num_layers: int, num_heads: int, d_ff: int, rope_theta: float,
+                device=None, dtype=None,
+                use_rms_norm: bool = True,
+                norm_mode: str = "pre",
+                ffn_type: str = "swiglh"):
+        super().__init__()
+        self.context_length = context_length
+
+        # 1.embedding 层
+        self.token_embeddings = Embedding(vocab_size,d_model, device=device, dtype=dtype)
+
+        # 2.堆叠transformer block
+        self.layers = nn.ModuleList(
+            [TransformerBlock(
+                d_model, num_heads, d_ff, context_length, rope_theta,
+                device=device, dtype=dtype,
+                use_rms_norm=use_rms_norm,
+                norm_mode=norm_mode,
+                ffn_type=ffn_type
+            )]
+            for _ in range(num_layers)
+        )
+
+        # 3.最终输出
+        
+                
+                    
+
+
+
+
+
 
 
