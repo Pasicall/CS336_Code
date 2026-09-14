@@ -19,6 +19,8 @@ from cs336_basics.nn import softmax
 from cs336_basics.nn import scaled_dot_product_attention
 from cs336_basics.nn import CausalSelfAttention
 from cs336_basics.nn import TransformerBlock
+from cs336_basics.nn import TransformerLM
+
 
 
 
@@ -408,7 +410,65 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    llm = TransformerLM(
+        vocab_size=vocab_size,
+        context_length=context_length,
+        d_model=d_model,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        rope_theta=rope_theta,
+        device=in_indices.device,
+        dtype=weights["token_embeddings.weight"].dtype,
+        use_rms_norm=True,
+        norm_mode="pre",
+        ffn_type="swiglu"
+    )
+    with torch.no_grad():
+        # embedding layer
+        llm.token_embeddings.weight.copy_(weights["token_embeddings.weight"])
+        # transformer layer
+        for i in range(num_layers):
+            layer = llm.layers[i]
+
+            layer.attn.q_proj.weight.copy_(
+                weights[f"layers.{i}.attn.q_proj.weight"]
+            )
+            layer.attn.k_proj.weight.copy_(
+                weights[f"layers.{i}.attn.k_proj.weight"]
+            )
+            layer.attn.v_proj.weight.copy_(
+                weights[f"layers.{i}.attn.v_proj.weight"]
+            )
+            layer.attn.output_proj.weight.copy_(
+                weights[f"layers.{i}.attn.output_proj.weight"]
+            )
+            layer.ln1.weight.copy_(
+                weights[f"layers.{i}.ln1.weight"]
+            )
+            layer.ffn.w1.weight.copy_(
+                weights[f"layers.{i}.ffn.w1.weight"]
+            )
+            layer.ffn.w2.weight.copy_(
+                weights[f"layers.{i}.ffn.w2.weight"]
+            )
+            layer.ffn.w3.weight.copy_(
+                weights[f"layers.{i}.ffn.w3.weight"]
+            )
+            layer.ln2.weight.copy_(
+                weights[f"layers.{i}.ln2.weight"]
+            )
+            
+        # final rmsnorm
+        llm.ln_final.weight.copy_(
+            weights["ln_final.weight"]
+        )
+        # lm head
+        llm.lm_head.weight.copy_(
+            weights["lm_head.weight"]
+        )
+        return llm(in_indices)
+            
 
 
 def run_rmsnorm(

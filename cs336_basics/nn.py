@@ -252,7 +252,7 @@ class TransformerLM(nn.Module):
                 device=None, dtype=None,
                 use_rms_norm: bool = True,
                 norm_mode: str = "pre",
-                ffn_type: str = "swiglh"):
+                ffn_type: str = "swiglu"):
         super().__init__()
         self.context_length = context_length
 
@@ -260,19 +260,41 @@ class TransformerLM(nn.Module):
         self.token_embeddings = Embedding(vocab_size,d_model, device=device, dtype=dtype)
 
         # 2.堆叠transformer block
-        self.layers = nn.ModuleList(
-            [TransformerBlock(
-                d_model, num_heads, d_ff, context_length, rope_theta,
+        self.layers = nn.ModuleList([
+            TransformerBlock(
+                d_model, num_heads, d_ff, context_length, rope_theta, 
                 device=device, dtype=dtype,
                 use_rms_norm=use_rms_norm,
                 norm_mode=norm_mode,
                 ffn_type=ffn_type
-            )]
+            )
             for _ in range(num_layers)
-        )
+        ])
 
-        # 3.最终输出
-        
+        # 3.最终输出层
+        if use_rms_norm:
+            self.ln_final = RMSNorm(d_model=d_model, device=device, dtype=dtype)
+        else:
+            self.ln_final = nn.Identity()
+
+        # 最后套一个Linear层映射回词表大小
+        self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
+
+    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
+        b, s = token_ids.shape   #[batch_size, sequence_length]
+        token_positions = torch.arange(s,device=token_ids.device).unsqueeze(0).expand(b,s)
+
+        # Embedding
+        x = self.token_embeddings(token_ids) 
+
+        # 通过Transformer block
+        for layer in self.layers:
+            x = layer(x, token_positions=token_positions)
+
+        # 归一化输出
+        x = self.ln_final(x)
+        # 投影到词表空间获得logits
+        return self.lm_head(x)
                 
                     
 
