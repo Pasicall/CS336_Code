@@ -83,6 +83,37 @@ class AdamW(Optimizer):
                     p.add_(p, alpha=-lr * wd)
         return loss
 
+def clip_gradient_norm(parameters: Iterable[torch.nn.Parameter], max_norm: float):
+    """
+    实现梯度裁剪
+    parameters: 可迭代的参数列表
+    max_norm: 允许的最大梯度的L2范数
+    """
+
+    # 过滤掉没有梯度的参数
+    params_with_grad = [p for p in parameters if p.grad is not None]
+    if params_with_grad is None:
+        return 
+
+    # 计算全局L2范数  -- 将模型所有层的梯度拼接成一个巨大的向量
+    total_norm = 0.0
+    for p in params_with_grad:
+        param_norm = torch.norm(p.grad.detach(), p=2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+
+    # 检查是否超过阈值
+    eps = 1e-6
+    if total_norm > max_norm:
+        # 计算缩放因子
+        clip_coef = max_norm / (total_norm + eps)
+
+        # 修改每个每个参数的梯度
+        for p in params_with_grad:
+            p.grad.detach().mul_(clip_coef)
+
+
+
 
 
 

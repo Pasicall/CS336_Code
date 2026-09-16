@@ -11,6 +11,8 @@ from torch import Tensor
 
 from cs336_basics.train_bpe import train_bpe
 from cs336_basics.tokenizer import BPETokenizer
+from cs336_basics.nn import Linear
+from cs336_basics.nn import Embedding
 from cs336_basics.nn import RMSNorm
 from cs336_basics.nn import silu_fn
 from cs336_basics.nn import SwiGLU
@@ -22,14 +24,8 @@ from cs336_basics.nn import TransformerBlock
 from cs336_basics.nn import TransformerLM
 from cs336_basics.losses import cross_entropy
 from cs336_basics.optimizer import AdamW
-
-
-
-
-
-
-
-
+from cs336_basics.scheduler import get_lr_cosine_scheduler
+from cs336_basics.optimizer import clip_gradient_norm
 
 
 def run_linear(
@@ -51,7 +47,10 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
 
-    raise NotImplementedError
+    linear = Linear(d_in,d_out,device=in_features.device,dtype=in_features.dtype)
+    with torch.no_grad():
+        linear.weight.copy_(weights)
+    return linear(in_features)
 
 
 def run_embedding(
@@ -72,10 +71,12 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
+    emdedding = Embedding(vocab_size,d_model)
+    with torch.no_grad():
+        emdedding.weight.copy_(weights)
+    return emdedding(token_ids)
 
-    raise NotImplementedError
-
-
+    
 def run_swiglu(
     d_model: int,
     d_ff: int,
@@ -580,7 +581,7 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    return clip_gradient_norm(parameters=parameters,max_norm=max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
@@ -615,7 +616,7 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return get_lr_cosine_scheduler(it,max_learning_rate,min_learning_rate,warmup_iters,cosine_cycle_iters)
 
 
 def run_save_checkpoint(

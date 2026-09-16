@@ -26,7 +26,7 @@ class BPETokenizer:
         参数:
             vocab: 词汇表，建立整数 ID 到 字节块(bytes) 的映射。
             merges: 合并规则列表。列表中的每一项是一个二元组 (bytes_a, bytes_b)，
-                   表示在训练过程中 bytes_a 和 bytes_b 被合并的顺序。
+            表示在训练过程中 bytes_a 和 bytes_b 被合并的顺序。
             special_tokens: 特殊标记列表（如 <|endoftext|>），这些标记不会被 BPE 规则拆分。
         """
         # 1. 建立双向映射，方便查表
