@@ -182,22 +182,23 @@ def save_tokenizer_files(vocab,merges,out_dir):
     with open(os.path.join(out_dir,"vocab.json"),"w",encoding="utf-8") as f:
         json.dump(json_vocab,f,indent=4)
     
-    with open(os.path.join(out_dir,"merges.json"),"w",encoding="utf-8") as f:
+    with open(os.path.join(out_dir,"merges.txt"),"w",encoding="utf-8") as f:
         for p1,p2 in merges:
             s1= "".join(byte_encoder[b] for b in p1)
             s2= "".join(byte_encoder[b] for b in p2)
             f.write(f"{s1} {s2}\n")
     
 def main():
-    input_path = "/home/pasical/projects/dl/LLM/CS336/assignment1-basics/data/demo2.txt"
-    vocab_size = 10000
+    input_path = "data/tinystories_small.txt"
+    vocab_size = 1000
 
     special_tokens = ["<|endoftext|>"]
-    output_dir = "/home/pasical/projects/dl/LLM/CS336/assignment1-basics/data/output"
+    output_dir = "data/tinystories_small-train"
 
     print(f"开始训练BPE分词器，目标词表大小{vocab_size}...")
     vocab, merges = train_bpe(input_path, vocab_size, special_tokens)
     save_tokenizer_files(vocab,merges,output_dir)
+    print("训练成功")
     
 if __name__ == "__main__":
     main()

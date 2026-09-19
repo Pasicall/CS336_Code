@@ -115,9 +115,9 @@ def process_corpus(input_txt: str, output_bin: str, tokenizer: BPETokenizer, chu
 def main():
     # --- 配置区 ---
     # 根据你的训练结果修改路径
-    BASE_DIR = "data/TinyStoriesV2-GPT4-train"
-    input_file = "data/TinyStoriesV2-GPT4-valid.txt" # 待处理的原始语料
-    output_file = "data/TinyStoriesV2-GPT4-valid.bin" # 输出的二进制文件
+    BASE_DIR = "data/tinystories_small-train"
+    input_file = "data/tinystories_small.txt" # 待处理的原始语料
+    output_file = "data/tinystories_small.bin" # 输出的二进制文件
     
     vocab_json = os.path.join(BASE_DIR, "vocab.json")
     merges_txt = os.path.join(BASE_DIR, "merges.txt")

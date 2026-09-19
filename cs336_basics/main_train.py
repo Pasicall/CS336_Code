@@ -75,15 +75,15 @@ def main():
     parser.add_argument("--run_name", type=str, default=None, help="WandB实验名称")
 
     args = parser.parse_args()
-    os.mkdir(args.out_dir, exit_ok=True)
+    os.makedirs(args.out_dir, exit_ok=True)
 
     # load dataset
     if not os.path.exists(args.train_data_path):
         raise FileNotFoundError(f"Training dataset not found at {args.train_data_path}")
     if not os.path.exists(args.val_data_path):
         raise FileNotFoundError(f"Training dataset not found at {args.val_data_path}")
-    train_data = load_dateset(args.train_data_set)
-    val_data = load_dateset(args.train_data_set)
+    train_data = load_dateset(args.train_data_path)
+    val_data = load_dateset(args.val_data_path)
     print(f"训练集大小{len(train_data)}tokens")
     print(f"验证集大小{len(val_data)}tokens")
 
@@ -114,8 +114,8 @@ def main():
     start_iter = 0
     ckpt_path = os.path.join(args.out_dir,"ckpt.pt")
     if os.path.exists(ckpt_path):
-        star_iter = load_checkpoint(ckpt_path,model,optimizer)
-        print(f"Resuming from iteration {star_iter}")
+        start_iter = load_checkpoint(ckpt_path,model,optimizer)
+        print(f"Resuming from iteration {start_iter}")
 
     # WandB init
     wandb.init(
@@ -176,7 +176,7 @@ def main():
             save_checkpoint(model=model,optimizer=optimizer,iteration=it,out=ckpt_path)
 
 # 训练结束保存最终模型
-    save_checkpoint(model=model,optimizer=optimizer,iteration=it,out=ckpt_path)
+    save_checkpoint(model=model,optimizer=optimizer,iteration=args.max_iters,out=os.path.join(args.out_dir,"ckpt_final.pt"))
     wandb.finish()
 
 

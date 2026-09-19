@@ -295,6 +295,53 @@ class TransformerLM(nn.Module):
         x = self.ln_final(x)
         # 投影到词表空间获得logits
         return self.lm_head(x)
+
+    @torch.no_grad()
+    def generate(
+        self,
+        prompt_ids: torch.Tensor,
+        max_new_tokens: int,
+        eos_token_id: int = None,
+        temperature: float = 1.0,
+        top_p: float = 1.0
+    ) -> torch.Tensor:
+        """
+        从模型生成文本ID 序列
+
+        参数：
+        prompt_ids: 提示词id
+        max_new_tokens: 最多生成的词数
+        eos_token_id: 停止生成的 token_id
+        """
+        self.eval()
+        generated = prompt_ids.clone()
+
+        for _ in range(max_new_tokens):
+            # 处理输入长度，模型最多只能读 context_length 长度的内容。
+            # 如果过长取最后 context_length 长度
+            idx_cond = generated[:, -self.context_length:]
+
+            # 前向传播得到logits，只需要最后一个时间步的logits
+            logits = self.forward(idx_cond)
+            logits = logits [:, -1, :]
+
+            # 温度缩放策略： 值越高模型生成的文本随机性越强，反之则更偏向于保守
+            if temperature != 1:
+                logits = logits / (temperature + 1e-8) 
+
+            # 应用top_p过滤
+
+        pass
+
+    def top_p_filter(self, logits: torch.Tensor, p: float) -> torch.Tensor:
+        # 排序
+        sorted_logits, sorted_indices = torch.sort(logits,descending=True,dim=-1)
+
+        # 累积
+        
+        # 截断
+
+        # 重归一化
                 
                     
 
