@@ -330,18 +330,39 @@ class TransformerLM(nn.Module):
                 logits = logits / (temperature + 1e-8) 
 
             # 应用top_p过滤
+            if top_p < 1.0 :
+                logits = self.top_p_filter(logits, top_p)
 
-        pass
+            # 归一化采样
+            probs = softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+
+            # 拼接新词
+            generated = torch.cat((generated, next_token), dim=1)
+
+            if eos_token_id is not None and (next_token == eos_token_id).all():
+                break
+
+        return generated
 
     def top_p_filter(self, logits: torch.Tensor, p: float) -> torch.Tensor:
         # 排序
         sorted_logits, sorted_indices = torch.sort(logits,descending=True,dim=-1)
 
         # 累积
-        
-        # 截断
+        cumulative_probs = torch.cumsum(softmax(logits, dim=-1), dim=-1)
 
-        # 重归一化
+        # 截断
+        # 创建掩码，去掉累积概率超过p的token
+        sorted_indices_to_remove = cumulative_probs > p
+        # 确保保留第一个词，即保留第一个累积概率>p的词，做法是将标记右移一位
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = False
+
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        logits = logits.masked_fill(indices_to_remove, float('-inf'))
+
+        return logits
                 
                     
 
